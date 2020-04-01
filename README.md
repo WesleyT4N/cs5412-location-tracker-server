@@ -18,3 +18,7 @@ This project uses `pytest` for unit testing.
 
 - Within the project directory make sure you first call `source .env` this will export all the necessary env vars for the application
 - Run `pytest` which will run all available tests within the `tests/` directory
+
+## Where to access
+
+Temporarily hosted at `https://loc-traffic-tracker.azurewebsites.net/api/locations/f1ad9aff-6c4b-4e3e-a98c-4de2e8f357a0/sensors`
