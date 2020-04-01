@@ -12,7 +12,7 @@ on:
 # 2. Change these variables for your configuration:
 env:
   AZURE_WEBAPP_NAME: location-traffic-tracker # set this to your application's name
-  AZURE_WEBAPP_PACKAGE_PATH: './'         # set this to the path to your web app project, defaults to the repository root
+  AZURE_WEBAPP_PACKAGE_PATH: './app'         # set this to the path to your web app project, defaults to the repository root
   PYTHON_VERSION: '3.7'                  # set this to the python version to use
 
 jobs:
@@ -33,5 +33,5 @@ jobs:
       uses: azure/webapps-deploy@v2
       with:
         app-name: ${{ env.AZURE_WEBAPP_NAME }}
-        publish-profile: ${{ secrets.AzureAppService_PublishProfile_3c8ed51f5c8a4307919553de8b10f5f9 }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
         package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
