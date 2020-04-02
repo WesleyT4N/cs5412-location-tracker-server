@@ -32,6 +32,12 @@ class UpdateLocationSchema(Schema):
     name = fields.Str()
     capacity = fields.Integer()
 
+def get_location(location_id):
+    try:
+        return Location.get_by_id(location_id)
+    except exceptions.CosmosResourceNotFoundError as error:
+        return None
+
 @locations_bp.route("", methods=["GET", "POST"])
 def locations():
     if request.method == "GET":

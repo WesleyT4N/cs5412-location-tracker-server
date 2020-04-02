@@ -10,7 +10,7 @@ from app.models import db
 from app.models.location import Location
 from app.models.sensor import Sensor
 
-from app.routes.locations import LocationSchema
+from app.routes.locations import LocationSchema, get_location
 
 class SensorSchema(Schema):
     id = fields.UUID()
@@ -56,12 +56,6 @@ def remove_sensor_from_location(sensor_id, old_location):
         updated_location.container_name,
     )
 
-def location_exists(location_id):
-    try:
-        return Location.get_by_id(location_id)
-    except exceptions.CosmosResourceNotFoundError as error:
-        return None
-
 @sensors_bp.route("", methods=["GET", "POST"])
 def sensors(location_id):
     """
@@ -69,7 +63,7 @@ def sensors(location_id):
     POST: Upserts a new sensor for <location_id>
     """
     if request.method == "GET":
-        location = location_exists(location_id)
+        location = get_location(location_id)
         if not location:
             return (
                 "Cannot get sensors for location that does not exist.",
@@ -90,7 +84,7 @@ def sensors(location_id):
                 HTTPStatus.INTERNAL_SERVER_ERROR,
             )
     else:
-        location = location_exists(location_id)
+        location = get_location(location_id)
         if not location:
             return (
                 "Cannot create sensor for location that does not exist.",
@@ -136,7 +130,7 @@ def sensors(location_id):
 @sensors_bp.route("/<sensor_id>", methods=["GET", "PUT", "DELETE"])
 def sensor(location_id, sensor_id):
     if request.method == "GET":
-        location = location_exists(location_id)
+        location = get_location(location_id)
         if not location:
             return (
                 "Cannot get sensor for location that does not exist.",
@@ -158,7 +152,7 @@ def sensor(location_id, sensor_id):
                 HTTPStatus.NOT_FOUND,
             )
     elif request.method == "PUT":
-        location = location_exists(location_id)
+        location = get_location(location_id)
         if not location:
             return (
                 "Cannot update sensor for location that does not exist.",
@@ -195,7 +189,7 @@ def sensor(location_id, sensor_id):
                 HTTPStatus.NOT_FOUND,
             )
     else: # DELETE
-        location = location_exists(location_id)
+        location = get_location(location_id)
         if not location:
             return (
                 "Cannot delete sensor for location that does not exist.",
