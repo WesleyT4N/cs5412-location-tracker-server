@@ -8,6 +8,7 @@ def create_app(testing=False):
     """
     app = Flask(__name__, instance_relative_config=True)
     app.testing = testing
+    app.url_map.strict_slashes = False
     db.init_app(app)
     db.register_containers()
     register_blueprints(app)
