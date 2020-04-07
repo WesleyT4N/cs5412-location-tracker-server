@@ -12,6 +12,8 @@ from app.models.sensor import Sensor
 
 from app.routes.locations import LocationSchema, get_location
 
+# TODO: Add Caching Layer
+
 class SensorSchema(Schema):
     id = fields.UUID()
     name = fields.Str()
@@ -67,7 +69,7 @@ def sensors(location_id):
         if not location:
             return (
                 "Cannot get sensors for location that does not exist.",
-                HTTPStatus.INTERNAL_SERVER_ERROR,
+                HTTPStatus.NOT_FOUND,
             )
         items = Sensor.all_for_location(location_id)
         schema = SensorSchema(many=True, unknown="EXCLUDE")
@@ -88,7 +90,7 @@ def sensors(location_id):
         if not location:
             return (
                 "Cannot create sensor for location that does not exist.",
-                HTTPStatus.INTERNAL_SERVER_ERROR,
+                HTTPStatus.NOT_FOUND,
             )
         data = request.get_json()
         data["locationId"] = location_id
@@ -111,14 +113,14 @@ def sensors(location_id):
                 Sensor.delete(str(created_sensor.id), location_id)
                 return (
                     "Could not register sensor to location, location does not exist.",
-                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                    HTTPStatus.NOT_FOUND,
                 )
         except ValidationError as error:
             # TODO: Implement logging
             print("ValidationError: Could not create sensor: ", error)
             return (
                 "Cannot create sensor. Invalid arguments",
-                HTTPStatus.INTERNAL_SERVER_ERROR,
+                HTTPStatus.BAD_REQUEST,
             )
         except exceptions.CosmosHttpResponseError as error:
             print("Could not create sensor: ", error)
@@ -134,7 +136,7 @@ def sensor(location_id, sensor_id):
         if not location:
             return (
                 "Cannot get sensor for location that does not exist.",
-                HTTPStatus.INTERNAL_SERVER_ERROR,
+                HTTPStatus.NOT_FOUND,
             )
         try:
             item = Sensor.get_by_id_and_location_id(sensor_id, location_id)
@@ -156,7 +158,7 @@ def sensor(location_id, sensor_id):
         if not location:
             return (
                 "Cannot update sensor for location that does not exist.",
-                HTTPStatus.INTERNAL_SERVER_ERROR,
+                HTTPStatus.NOT_FOUND,
             )
         try:
             input_schema = UpdateSensorSchmea()
@@ -180,7 +182,7 @@ def sensor(location_id, sensor_id):
             print("ValidationError: Cannot update sensor: ", error) # TODO: Implement logging
             return (
                 "Cannot update sensor. Invalid arguments",
-                HTTPStatus.INTERNAL_SERVER_ERROR,
+                HTTPStatus.BAD_REQUEST,
             )
         except exceptions.CosmosResourceNotFoundError as error:
             print("Could not find sensor in container", error)
@@ -193,7 +195,7 @@ def sensor(location_id, sensor_id):
         if not location:
             return (
                 "Cannot delete sensor for location that does not exist.",
-                HTTPStatus.INTERNAL_SERVER_ERROR,
+                HTTPStatus.NOT_FOUND,
             )
         try:
             if (

@@ -8,6 +8,8 @@ from app.models.location import Location
 
 locations_bp = Blueprint("locations", __name__, url_prefix="/api/locations")
 
+# TODO: Add caching layer
+
 class LocationSchema(Schema):
     id = fields.UUID()
     name = fields.Str()
@@ -80,7 +82,7 @@ def locations():
             print("ValidationError: Could not create location: ", error)
             return (
                 "Cannot create location. Invalid arguments",
-                HTTPStatus.INTERNAL_SERVER_ERROR,
+                HTTPStatus.BAD_REQUEST,
             )
         except exceptions.CosmosHttpResponseError as error:
             print("Could not create location: ", error)
@@ -101,8 +103,8 @@ def location(location_id):
             # TODO: Implement logging
             print("validationerror: cannot retrieve location: ", error)
             return (
-                "cannot retrieve location",
-                HTTPStatus.INTERNAL_SERVER_ERROR,
+                "Cannot retrieve location due to schema error.",
+                HTTPStatus.INTERNAL_ScERVER_ERROR,
             )
         except exceptions.CosmosResourceNotFoundError as error:
             print("Could not find location in container", error)
@@ -134,7 +136,7 @@ def location(location_id):
         except ValidationError as error:
             print("ValidationError: Cannot update location: ", error) # TODO: Implement logging
             return (
-                "Cannot update location. Invalid arguments", HTTPStatus.INTERNAL_SERVER_ERROR,
+                "Cannot update location. Invalid arguments", HTTPStatus.BAD_REQUEST,
             )
         except exceptions.CosmosResourceNotFoundError as error:
             print("Could not find location in container", error)
