@@ -1,5 +1,6 @@
 from http import HTTPStatus
 import datetime as dt
+import json
 from enum import Enum
 
 from flask import Blueprint, current_app, request, jsonify
@@ -25,15 +26,16 @@ class DatastoreStatisticsEnum(Enum):
 traffic_bp = Blueprint("traffic", __name__, url_prefix="/api/locations/<location_id>/")
 
 class BaseTrafficSchema(Schema):
-    fetched_at = fields.DateTime(data_key="fetchedAt")
+    fetched_at = fields.DateTime(default=dt.datetime.utcnow(), data_key="fetchedAt")
+    location_id = fields.UUID(data_key="locationId")
 
 class TrafficCountSchema(BaseTrafficSchema):
     time = fields.DateTime()
     traffic_count = fields.Int(data_key="trafficCount")
 
 class TrafficCountInputSchema(Schema):
-    sensor_ids = fields.List(fields.UUID())
-
+    time = fields.DateTime(default=dt.datetime.utcnow(), required=False)
+    sensor_ids = fields.List(fields.UUID(), required=False)
 
 class PeakTrafficSchema(BaseTrafficSchema):
     peak_traffic = fields.Nested(
@@ -58,26 +60,48 @@ def get_sensor_ids(location_id):
         for sensor in Sensor.all_for_location(location_id)
     ]
 
-def build_data_store_request(sensor_ids, start_time=None, end_time=None):
-    pass
+def get_from_data_store(endpoint, args):
+    url = current_app.config["DATA_STORE_BASE_URL"] + endpoint
+    return requests.get(url, params=args)
 
 @traffic_bp_route("traffic_count", methods["GET"])
 def get_traffic_count(location_id):
-    if "sensor_ids" in request.args:
-        sensor_ids = request.args.getlist("sensor_ids", None)
-    else:
-        sensor_ids = get_sensor_ids(location_id)
-        if sensor_ids is None:
+    request.args["locationId"] = location_id
+    input_schema = TrafficCountInputSchema()
+    try:
+        args = input_schema.load(request.args)
+        if args.sensor_ids is not None:
+            sensor_ids = args.sensor_ids
+        else:
+            sensor_ids = get_sensor_ids(location_id)
+            if sensor_ids is None:
+                return (
+                    "Cannot get traffic for location that does not exist.",
+                    HTTPStatus.NOT_FOUND,
+                )
+        if len(sensor_ids) == 0:
             return (
-                "Cannot get traffic for location that does not exist.",
-                HTTPStatus.NOT_FOUND,
+                "Cannot get traffic for location that has 0 registered sensors",
+                HTTPStatus.BAD_REQUEST,
             )
-    if len(sensor_ids) == 0:
+        response = get_from_data_store(input_schema.dump(args))
+        if response.status_code == HTTPStatus.OK:
+            output_schema = TrafficCountSchema()
+            output = output_schema.load(response.json())
+            return (
+                jsonify(output_schema.dump(output)),
+                HTTPStatus.OK,
+            )
         return (
-            "Cannot get traffic for location that has 0 registered sensors",
+            response.text,
+            response.status_code
+        )
+    except ValidationError as error:
+        print("ValidationError: Cannot get traffic: ", error.messages) # TODO: Implement logging
+        return (
+            "Cannot get traffic for requested location. Invalid request",
             HTTPStatus.BAD_REQUEST,
         )
-    pass
 
 @traffic_bp_route("peak_traffic", methods["GET"])
 def get_peak_traffic(location_id):
@@ -95,7 +119,7 @@ def get_peak_traffic(location_id):
             "Cannot get traffic for location that has 0 registered sensors",
             HTTPStatus.BAD_REQUEST,
         )
-    pass
+
 
 @traffic_bp_route("traffic_history", methods["GET"])
 def get_traffic_history(location_id):

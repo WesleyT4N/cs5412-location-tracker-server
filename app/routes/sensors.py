@@ -79,7 +79,7 @@ def sensors(location_id):
         except ValidationError as error:
             print(
                 "ValidationError: Invalid format detected in sensor list: ",
-                error,
+                error.messages,
             ) # TODO: Implement logging
             return (
                 "Cannot return sensor list. Invalid results",
@@ -117,7 +117,7 @@ def sensors(location_id):
                 )
         except ValidationError as error:
             # TODO: Implement logging
-            print("ValidationError: Could not create sensor: ", error)
+            print("ValidationError: Could not create sensor: ", error.messages)
             return (
                 "Cannot create sensor. Invalid arguments",
                 HTTPStatus.BAD_REQUEST,
@@ -145,7 +145,7 @@ def sensor(location_id, sensor_id):
             return (jsonify(schema.dump(item)), HTTPStatus.OK)
         except ValidationError as error:
             # TODO: Implement logging
-            print("ValidationError: cannot retrieve sensor: ", error)
+            print("ValidationError: cannot retrieve sensor: ", error.messages)
             return ("cannot retrieve sensor", HTTPStatus.INTERNAL_SERVER_ERROR)
         except exceptions.CosmosResourceNotFoundError as error:
             print("Could not find sensor in container", error)
@@ -179,7 +179,7 @@ def sensor(location_id, sensor_id):
             response = (jsonify(output_schema.dump(updated_sensor)), HTTPStatus.OK)
             return response
         except ValidationError as error:
-            print("ValidationError: Cannot update sensor: ", error) # TODO: Implement logging
+            print("ValidationError: Cannot update sensor: ", error.messages) # TODO: Implement logging
             return (
                 "Cannot update sensor. Invalid arguments",
                 HTTPStatus.BAD_REQUEST,

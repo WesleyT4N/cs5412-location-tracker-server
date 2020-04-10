@@ -14,6 +14,11 @@ def create_app(testing=False):
     register_blueprints(app)
     return app
 
+def load_env_vars(app):
+    dotenv_path = os.path.abspath(__file__ + "../.env")
+    load_dotenv(dotenv_path)
+    app.config["DATA_STORE_BASE_URL"] = os.environ["DATA_STORE_BASE_URL"]
+
 def register_blueprints(app):
     """
     Registers app blueprints

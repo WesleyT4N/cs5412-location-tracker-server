@@ -54,7 +54,7 @@ def locations():
         except ValidationError as error:
             print(
                 "ValidationError: Invalid format detected in location list: ",
-                error,
+                error.messages,
             ) # TODO: Implement logging
             return (
                 "Cannot return location list. Invalid results",
@@ -79,7 +79,7 @@ def locations():
             )
         except ValidationError as error:
             # TODO: Implement logging
-            print("ValidationError: Could not create location: ", error)
+            print("ValidationError: Could not create location: ", error.messages)
             return (
                 "Cannot create location. Invalid arguments",
                 HTTPStatus.BAD_REQUEST,
@@ -101,7 +101,7 @@ def location(location_id):
             return (jsonify(schema.dump(item)), HTTPStatus.OK)
         except ValidationError as error:
             # TODO: Implement logging
-            print("validationerror: cannot retrieve location: ", error)
+            print("validationerror: cannot retrieve location: ", error.messages)
             return (
                 "Cannot retrieve location due to schema error.",
                 HTTPStatus.INTERNAL_ScERVER_ERROR,
@@ -119,7 +119,7 @@ def location(location_id):
             data = request.get_json()
             errors = input_schema.validate(data)
             if len(errors) != 0:
-                raise ValidationError(errors)
+                raise ValidationError({"messages": errors})
             data["id"] = location_id
             old_location = Location.get_by_id(location_id)
             updated_location = output_schema.load(data)
@@ -134,7 +134,7 @@ def location(location_id):
                 HTTPStatus.OK,
             )
         except ValidationError as error:
-            print("ValidationError: Cannot update location: ", error) # TODO: Implement logging
+            print("ValidationError: Cannot update location: ", error.messages) # TODO: Implement logging
             return (
                 "Cannot update location. Invalid arguments", HTTPStatus.BAD_REQUEST,
             )
