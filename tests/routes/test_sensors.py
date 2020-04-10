@@ -8,6 +8,7 @@ from marshmallow import ValidationError
 from tests.test_app import app
 from app.routes.sensors import SensorSchema
 
+
 def test_can_create_sensor(app, monkeypatch):
     some_id = str(uuid.uuid4())
     existing_loc = {
@@ -52,6 +53,7 @@ def test_can_create_sensor(app, monkeypatch):
     assert res.type == data_in["type"]
     assert str(res.location_id) == data_in["locationId"]
 
+
 def test_can_search_for_sensors(app, monkeypatch):
     loc_id = str(uuid.uuid4())
     existing_sensors = [{
@@ -66,9 +68,27 @@ def test_can_search_for_sensors(app, monkeypatch):
         "locationId": loc_id,
     }]
 
+    existing_loc = {
+        "id": loc_id,
+        "name": "a test location",
+        "locationId": loc_id,
+        "capacity": 10,
+        "sensors": [],
+    }
+
     def mock_query_items(*args, **kwargs):
         return existing_sensors
+
+    def mock_read_item(container, item_id, partition_key):
+        if (
+            item_id == str(existing_loc["id"])
+            and partition_key == str(existing_loc["locationId"])
+        ):
+            return existing_loc
+        return {}
+
     monkeypatch.setattr("azure.cosmos.ContainerProxy.query_items", mock_query_items)
+    monkeypatch.setattr("azure.cosmos.ContainerProxy.read_item", mock_read_item)
     response = app.get("/api/locations/{}/sensors".format(loc_id))
     assert response.status_code == HTTPStatus.OK
     schema = SensorSchema(many=True, unknown="EXCLDUE")
@@ -83,9 +103,23 @@ def test_can_get_sensor(app, monkeypatch):
         "locationId": loc_id,
     }
 
+    existing_loc = {
+        "id": loc_id,
+        "name": "a test location",
+        "locationId": loc_id,
+        "capacity": 10,
+        "sensors": [],
+    }
+
     def mock_read_item(container, item_id, partition_key):
-        if (item_id == str(existing_sensor["id"])
-            and partition_key == str(existing_sensor["locationId"])
+        if (
+            item_id == str(existing_loc["id"])
+            and partition_key == str(existing_loc["locationId"])
+        ):
+            return existing_loc
+        if (
+            item_id == str(existing_sensor["id"])
+            and partition_key == str(existing_loc["locationId"])
         ):
             return existing_sensor
         return {}
@@ -95,6 +129,7 @@ def test_can_get_sensor(app, monkeypatch):
     assert response.status_code == HTTPStatus.OK
     schema = SensorSchema(unknown="EXCLDUE")
     assert str(schema.load(existing_sensor)) == str(schema.loads(response.data))
+
 
 def test_can_update_sensor(app, monkeypatch):
     loc_id = str(uuid.uuid4())
@@ -152,6 +187,7 @@ def test_can_update_sensor(app, monkeypatch):
     assert response.status_code == HTTPStatus.OK
     schema = SensorSchema(unknown="EXCLDUE")
     assert str(schema.load(expected_updated_sensor)) == str(schema.loads(response.data))
+
 
 def test_can_delete_sensor(app, monkeypatch):
     loc_id = str(uuid.uuid4())
