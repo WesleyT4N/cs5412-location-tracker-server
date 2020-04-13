@@ -3,6 +3,7 @@ import pytest
 import json
 import uuid
 import datetime as dt
+import time
 from http import HTTPStatus
 
 from marshmallow import ValidationError
@@ -32,13 +33,13 @@ def test_can_fetch_traffic_count_for_location(app, monkeypatch):
     sensor_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
     loc_id = str(uuid.uuid4())
     data_in = {
-        "time": dt.datetime.utcnow().isoformat(),
+        "time": int(time.time()),
         "sensor_ids": sensor_ids,
     }
 
     response_json =  {
-        "time": dt.datetime.utcnow().isoformat(),
-        "fetchedAt": dt.datetime.utcnow().isoformat(),
+        "time": int(time.time()),
+        "fetchedAt": int(time.time()),
         "trafficCount": 20,
     }
 
@@ -63,17 +64,17 @@ def test_can_fetch_peak_traffic_for_location(app, monkeypatch):
     sensor_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
     loc_id = str(uuid.uuid4())
     data_in = {
-        "start_time": dt.datetime.utcnow().isoformat(),
-        "end_time": dt.datetime.utcnow().isoformat(),
+        "start_time": int(time.time()),
+        "end_time":  int(time.time()),
         "sensor_ids": sensor_ids,
     }
 
     response_json =  {
         "startTime": data_in["start_time"],
         "endTime": data_in["end_time"],
-        "fetchedAt": dt.datetime.utcnow().isoformat(),
+        "fetchedAt": int(time.time()),
         "peakTraffic": {
-            "time": dt.datetime.utcnow().isoformat(),
+            "time":  int(time.time()),
             "trafficCount": 20,
         },
     }
@@ -99,20 +100,20 @@ def test_can_fetch_traffic_history_for_location(app, monkeypatch):
     sensor_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
     loc_id = str(uuid.uuid4())
     data_in = {
-        "start_time": dt.datetime.utcnow().isoformat(),
-        "end_time": dt.datetime.utcnow().isoformat(),
+        "start_time":  int(time.time()),
+        "end_time":  int(time.time()),
         "sensor_ids": sensor_ids,
     }
 
     response_json =  {
         "startTime": data_in["start_time"],
         "endTime": data_in["end_time"],
-        "fetchedAt": dt.datetime.utcnow().isoformat(),
+        "fetchedAt":  int(time.time()),
         "trafficHistory": [{
-            "time": dt.datetime.utcnow().isoformat(),
+            "time":  int(time.time()),
             "trafficCount": 20,
         }, {
-            "time": dt.datetime.utcnow().isoformat(),
+            "time":  int(time.time()),
             "trafficCount": 5,
         }],
     }
