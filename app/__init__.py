@@ -1,5 +1,6 @@
 import os
 from flask import Flask
+from flask_cors import CORS
 from dotenv import load_dotenv
 from app.models import db
 
@@ -8,6 +9,7 @@ def create_app(testing=False):
     Create app instance
     """
     app = Flask(__name__, instance_relative_config=True)
+    CORS(app)
     app.testing = testing
     app.url_map.strict_slashes = False
     load_env_vars(app)
