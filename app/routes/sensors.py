@@ -3,6 +3,7 @@ import uuid
 from flask import Blueprint, current_app, request, jsonify
 from marshmallow import fields, post_load, Schema, ValidationError
 from azure.cosmos import exceptions
+import requests
 
 sensors_bp = Blueprint("sensors", __name__, url_prefix="/api/locations/<location_id>/sensors")
 
@@ -58,6 +59,15 @@ def remove_sensor_from_location(sensor_id, old_location):
         updated_location.container_name,
     )
 
+def register_sensor_simulation(sensor_id, location_id):
+    url = current_app.config["SIMULATOR_SERVICE_BASE_URL"] + "/api/locations/" + location_id + "/sensors/" + sensor_id
+    return requests.put(url)
+
+def delete_sensor_simulation(sensor_id, location_id):
+    url = current_app.config["SIMULATOR_SERVICE_BASE_URL"] + "/api/locations/" + location_id + "/sensors/" + sensor_id
+    status_code = requests.delete(url).status_code
+    return status_code == HTTPStatus.OK or status_code == HTTPStatus.NOT_FOUND
+
 @sensors_bp.route("", methods=["GET", "POST"])
 def sensors(location_id):
     """
@@ -106,6 +116,7 @@ def sensors(location_id):
             # Side-effect: Updates location entry to contain the newly created sensor id
             try:
                 add_sensor_to_location(str(created_sensor.id), location)
+                response = register_sensor_simulation(str(created_sensor.id), location_id)
                 return (jsonify(output_schema.dump(created_sensor)), HTTPStatus.CREATED)
                 # if we failed to add, location may not exist anymore.
                 # Roll back sensor creation
@@ -200,6 +211,7 @@ def sensor(location_id, sensor_id):
         try:
             if (
                 remove_sensor_from_location(sensor_id, location)
+                and delete_sensor_simulation(sensor_id, location_id)
                 and Sensor.delete(sensor_id, location_id) is None
             ):
                 return ("", HTTPStatus.OK)

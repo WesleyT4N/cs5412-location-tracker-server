@@ -22,6 +22,7 @@ def load_env_vars(app):
     dotenv_path = os.path.abspath(__file__ + "/../../.env")
     load_dotenv(dotenv_path)
     app.config["DATA_STORE_BASE_URL"] = os.environ["DATA_STORE_BASE_URL"]
+    app.config["SIMULATOR_SERVICE_BASE_URL"] = os.environ["SIMULATOR_SERVICE_BASE_URL"]
 
 def register_blueprints(app):
     """

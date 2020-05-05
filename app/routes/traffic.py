@@ -20,9 +20,9 @@ class DatastoreEndpointEnum(Enum):
     List of possible statistics we can retrieve from the data-store
     """
 
-    TRAFFIC_COUNT = "/api/traffic_count"
-    PEAK_TRAFFIC = "/api/peak_traffic"
-    TRAFFIC_HISTORY = "/api/traffic_history"
+    TRAFFIC_COUNT = "/traffic_count"
+    PEAK_TRAFFIC = "/peak_traffic"
+    TRAFFIC_HISTORY = "/traffic_history"
 
 traffic_bp = Blueprint("traffic", __name__, url_prefix="/api/locations/<location_id>/")
 
@@ -36,15 +36,15 @@ class TrafficCountSchema(BaseTrafficSchema):
 
 class TrafficCountInputSchema(Schema):
     time = fields.Int(missing=int(time.time()), required=False)
-    sensor_ids = fields.List(fields.UUID(), required=False)
     location_id = fields.UUID(required=False)
 
+class PeakTrafficNestedSchema(Schema):
+    time = fields.Int(required=True)
+    count = fields.Int(required=True)
+
 class PeakTrafficSchema(BaseTrafficSchema):
-    start_time = fields.Int(required=True, data_key="startTime")
-    end_time = fields.Int(required=True, data_key="endTime")
     peak_traffic = fields.Nested(
-        TrafficCountSchema,
-        only=("time", "traffic_count"),
+        PeakTrafficNestedSchema,
         data_key="peakTraffic",
         required=True,
     )
@@ -52,22 +52,20 @@ class PeakTrafficSchema(BaseTrafficSchema):
 class PeakTrafficInputSchema(Schema):
     start_time = fields.Int(required=True)
     end_time = fields.Int(required=True)
-    sensor_ids = fields.List(fields.UUID(), required=False)
     location_id = fields.UUID(required=False)
 
 class TrafficHistorySchema(BaseTrafficSchema):
-    start_time = fields.Int(required=True, data_key="startTime")
-    end_time = fields.Int(required=True, data_key="endTime")
     traffic_history = fields.List(fields.Nested(
         TrafficCountSchema,
         only=("time", "traffic_count"),
     ), data_key="trafficHistory")
 
+
 class TrafficHistoryInputSchema(Schema):
     start_time = fields.Int(required=True)
     end_time = fields.Int(required=True)
-    sensor_ids = fields.List(fields.UUID(), required=False)
     location_id = fields.UUID(required=False)
+    time_interval = fields.Int()
 
 def get_sensor_ids(location_id):
     location = get_location(location_id)
@@ -78,8 +76,8 @@ def get_sensor_ids(location_id):
         for sensor in Sensor.all_for_location(location_id)
     ]
 
-def get_from_data_store(endpoint, args):
-    url = current_app.config["DATA_STORE_BASE_URL"] + endpoint
+def get_from_data_store(endpoint, location_id, args):
+    url = current_app.config["DATA_STORE_BASE_URL"] + "/api/locations/" + location_id + endpoint
     # Datastore expects unix timestamps rather than ISO format strings
     return requests.get(url, params=args)
 
@@ -87,24 +85,12 @@ def get_from_data_store(endpoint, args):
 def get_traffic_count(location_id):
     input_schema = TrafficCountInputSchema()
     try:
-        sensor_ids = request.args.getlist("sensor_ids")
         args = input_schema.load({
             **request.args,
             "location_id": location_id,
-            "sensor_ids": sensor_ids if len(sensor_ids) > 0 else get_sensor_ids(location_id),
         })
-        if args["sensor_ids"] is None:
-            return (
-                "Cannot get traffic count for location that does not exist.",
-                HTTPStatus.NOT_FOUND,
-            )
-        sensor_ids = args["sensor_ids"]
-        if len(sensor_ids) == 0:
-            return (
-                "Cannot get traffic count for location that has 0 registered sensors",
-                HTTPStatus.BAD_REQUEST,
-            )
-        response = get_from_data_store(DatastoreEndpointEnum.TRAFFIC_COUNT.value, input_schema.dump(args))
+        print(args)
+        response = get_from_data_store(DatastoreEndpointEnum.TRAFFIC_COUNT.value, location_id, input_schema.dump(args))
         if response.status_code == HTTPStatus.OK:
             output_schema = TrafficCountSchema()
             output = output_schema.load({
@@ -131,24 +117,11 @@ def get_traffic_count(location_id):
 def get_peak_traffic(location_id):
     input_schema = PeakTrafficInputSchema()
     try:
-        sensor_ids = request.args.getlist("sensor_ids")
         args = input_schema.load({
             **request.args,
             "location_id": location_id,
-            "sensor_ids": sensor_ids if len(sensor_ids) > 0 else get_sensor_ids(location_id),
         })
-        if args["sensor_ids"] is None:
-            return (
-                "Cannot get peak traffic for location that does not exist.",
-                HTTPStatus.NOT_FOUND,
-            )
-        sensor_ids = args["sensor_ids"]
-        if len(sensor_ids) == 0:
-            return (
-                "Cannot get peak traffic for location that has 0 registered sensors",
-                HTTPStatus.BAD_REQUEST,
-            )
-        response = get_from_data_store(DatastoreEndpointEnum.PEAK_TRAFFIC.value, input_schema.dump(args))
+        response = get_from_data_store(DatastoreEndpointEnum.PEAK_TRAFFIC.value, location_id, input_schema.dump(args))
         if response.status_code == HTTPStatus.OK:
             output_schema = PeakTrafficSchema()
             output = output_schema.load({
@@ -158,6 +131,7 @@ def get_peak_traffic(location_id):
                 jsonify(output_schema.dump(output)),
                 HTTPStatus.OK,
             )
+        print(response.text)
         return (
             response.text,
             response.status_code
@@ -173,24 +147,12 @@ def get_peak_traffic(location_id):
 def get_traffic_history(location_id):
     input_schema = TrafficHistoryInputSchema()
     try:
-        sensor_ids = request.args.getlist("sensor_ids")
         args = input_schema.load({
             **request.args,
             "location_id": location_id,
-            "sensor_ids": sensor_ids if len(sensor_ids) > 0 else get_sensor_ids(location_id),
+            "time_interval": 10,
         })
-        if args["sensor_ids"] is None:
-            return (
-                "Cannot get traffic history for location that does not exist.",
-                HTTPStatus.NOT_FOUND,
-            )
-        sensor_ids = args["sensor_ids"]
-        if len(sensor_ids) == 0:
-            return (
-                "Cannot get traffic history for location that has 0 registered sensors",
-                HTTPStatus.BAD_REQUEST,
-            )
-        response = get_from_data_store(DatastoreEndpointEnum.TRAFFIC_HISTORY.value, input_schema.dump(args))
+        response = get_from_data_store(DatastoreEndpointEnum.TRAFFIC_HISTORY.value, location_id, input_schema.dump(args))
         if response.status_code == HTTPStatus.OK:
             output_schema = TrafficHistorySchema()
             output = output_schema.load({
