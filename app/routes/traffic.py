@@ -35,7 +35,7 @@ class TrafficCountSchema(BaseTrafficSchema):
     traffic_count = fields.Int(data_key="trafficCount", required=True)
 
 class TrafficCountInputSchema(Schema):
-    time = fields.Int(missing=int(time.time()), required=False)
+    time = fields.Int(missing=lambda: int(time.time()), required=False)
     location_id = fields.UUID(required=False)
 
 class PeakTrafficNestedSchema(Schema):
@@ -89,7 +89,6 @@ def get_traffic_count(location_id):
             **request.args,
             "location_id": location_id,
         })
-        print(args)
         response = get_from_data_store(DatastoreEndpointEnum.TRAFFIC_COUNT.value, location_id, input_schema.dump(args))
         if response.status_code == HTTPStatus.OK:
             output_schema = TrafficCountSchema()
