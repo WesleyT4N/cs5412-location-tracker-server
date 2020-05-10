@@ -20,6 +20,14 @@ jobs:
       with:
         python-version: '3.7'
 
+    - name: Install Dependencies
+      run: |
+        apt-get install -y \
+          libmemcached11 \
+          libmemcachedutil2 \
+          libmemcached-dev \
+          libz-dev
+
     - name: Build using AppService-Build
       uses: azure/appservice-build@v1
       with:
