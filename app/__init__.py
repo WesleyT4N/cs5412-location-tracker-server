@@ -17,9 +17,11 @@ def create_app(testing=False):
     db.register_containers()
     register_blueprints(app)
     cache.init_app(app, {
-        "CACHE_TYPE": "memcached",
+        "CACHE_TYPE": "saslmemcached",
         "CACHE_MEMCACHED_SERVERS": [app.config["MEMCACHED_ADDR"]],
         "CACHE_DEFAULT_TIMEOUT": 60,
+        "CACHE_MEMCACHED_USERNAME" : app.config["MEMCACHED_USERNAME"],
+        "CACHE_MEMCACHED_PASSWORD" : app.config["MEMCACHED_PASSWORD"],
     })
     return app
 
@@ -29,6 +31,8 @@ def load_env_vars(app):
     app.config["DATA_STORE_BASE_URL"] = os.environ["DATA_STORE_BASE_URL"]
     app.config["SIMULATOR_SERVICE_BASE_URL"] = os.environ["SIMULATOR_SERVICE_BASE_URL"]
     app.config["MEMCACHED_ADDR"] = os.environ["MEMCACHED_ADDR"]
+    app.config["MEMCACHED_USERNAME"] = os.environ["MEMCACHED_USERNAME"]
+    app.config["MEMCACHED_PASSWORD"] = os.environ["MEMCACHED_PASSWORD"]
 
 def register_blueprints(app):
     """
