@@ -2,7 +2,7 @@ import os
 from flask import Flask
 from flask_cors import CORS
 from dotenv import load_dotenv
-from app.models import db
+from app.models import db, cache
 
 def create_app(testing=False):
     """
@@ -16,6 +16,11 @@ def create_app(testing=False):
     db.init_app(app)
     db.register_containers()
     register_blueprints(app)
+    cache.init_app(app, {
+        "CACHE_TYPE": "memcached",
+        "CACHE_MEMCACHED_SERVERS": [app.config["MEMCACHED_ADDR"]],
+        "CACHE_DEFAULT_TIMEOUT": 60,
+    })
     return app
 
 def load_env_vars(app):
@@ -23,6 +28,7 @@ def load_env_vars(app):
     load_dotenv(dotenv_path)
     app.config["DATA_STORE_BASE_URL"] = os.environ["DATA_STORE_BASE_URL"]
     app.config["SIMULATOR_SERVICE_BASE_URL"] = os.environ["SIMULATOR_SERVICE_BASE_URL"]
+    app.config["MEMCACHED_ADDR"] = os.environ["MEMCACHED_ADDR"]
 
 def register_blueprints(app):
     """

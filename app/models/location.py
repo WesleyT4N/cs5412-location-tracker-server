@@ -4,10 +4,11 @@ import uuid
 
 from .base_model import BaseModel
 from .utils import DatabaseContainerEnum
-from . import db
+from . import db, cache
 
 class Location(BaseModel):
     container_name = DatabaseContainerEnum.LOCATIONS.name
+    cache_prefix = "location:"
 
     def __init__(self,
         name,
@@ -30,12 +31,21 @@ class Location(BaseModel):
 
     @staticmethod
     def get_by_id(location_id):
-        return db.get_item_with_id_and_partition_key(location_id, location_id, Location.container_name)
+        cached_location = cache.get(Location.cache_prefix+location_id)
+        if cached_location:
+            return cached_location
+        location = db.get_item_with_id_and_partition_key(location_id, location_id, Location.container_name)
+        cache.set(Location.cache_prefix+location_id, location)
+        return location
+
 
     @staticmethod
+    @cache.cached(timeout=300, key_prefix="all_locations")
     def all():
         return db.query_all_items(Location.container_name)
 
     @staticmethod
     def delete(location_id):
+        cache.delete(Location.cache_prefix+location_id)
+        cache.delete("all_locations")
         return db.delete_item(location_id, location_id, Location.container_name)

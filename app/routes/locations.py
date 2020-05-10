@@ -3,7 +3,7 @@ from flask import Blueprint, current_app, request, jsonify
 from marshmallow import fields, post_load, Schema, ValidationError
 from azure.cosmos import exceptions
 
-from app.models import db
+from app.models import db, cache
 from app.models.location import Location
 
 locations_bp = Blueprint("locations", __name__, url_prefix="/api/locations")
@@ -128,6 +128,8 @@ def location(location_id):
                 output_schema.dump(updated_location),
                 Location.container_name,
             )
+            cache.set(Location.cache_prefix+location_id, updated_item)
+            cache.delete("all_locations")
             updated_item = output_schema.load(updated_item)
             return (
                 jsonify(output_schema.dump(updated_item)),
@@ -147,6 +149,8 @@ def location(location_id):
     else: # DELETE
         try:
             if Location.delete(location_id) is None:
+                cache.delete(Location.cache_prefix+location_id)
+                cache.delete("all_locations")
                 return ("", HTTPStatus.OK)
             return (
                 "Error occurred when deleting location",

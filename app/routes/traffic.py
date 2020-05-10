@@ -9,7 +9,7 @@ from marshmallow import fields, post_load, Schema, ValidationError
 from azure.cosmos import exceptions
 import requests
 
-from app.models import db
+from app.models import db, cache
 from app.models.sensor import Sensor
 from app.routes.locations import get_location
 
@@ -82,6 +82,7 @@ def get_from_data_store(endpoint, location_id, args):
     return requests.get(url, params=args)
 
 @traffic_bp.route("traffic_count", methods=["GET"])
+@cache.cached(timeout=60)
 def get_traffic_count(location_id):
     input_schema = TrafficCountInputSchema()
     try:
@@ -113,6 +114,7 @@ def get_traffic_count(location_id):
         )
 
 @traffic_bp.route("peak_traffic", methods=["GET"])
+@cache.cached(timeout=60)
 def get_peak_traffic(location_id):
     input_schema = PeakTrafficInputSchema()
     try:
@@ -143,6 +145,7 @@ def get_peak_traffic(location_id):
         )
 
 @traffic_bp.route("traffic_history", methods=["GET"])
+@cache.cached(timeout=60)
 def get_traffic_history(location_id):
     input_schema = TrafficHistoryInputSchema()
     try:

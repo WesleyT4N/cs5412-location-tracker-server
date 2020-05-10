@@ -7,7 +7,7 @@ import requests
 
 sensors_bp = Blueprint("sensors", __name__, url_prefix="/api/locations/<location_id>/sensors")
 
-from app.models import db
+from app.models import db, cache
 from app.models.location import Location
 from app.models.sensor import Sensor
 
@@ -43,6 +43,8 @@ def add_sensor_to_location(sensor_id, old_location):
     location_schema = LocationSchema(unknown="EXCLUDE")
     updated_location = location_schema.load(old_location)
     updated_location.sensors.append(uuid.UUID(sensor_id))
+    cache.delete(Location.cache_prefix+old_location["id"])
+    cache.delete("sensorsFor:"+location_id)
     return db.replace_item(
         old_location,
         location_schema.dump(updated_location),
@@ -53,6 +55,8 @@ def remove_sensor_from_location(sensor_id, old_location):
     location_schema = LocationSchema(unknown="EXCLUDE")
     updated_location = location_schema.load(old_location)
     updated_location.sensors.remove(uuid.UUID(sensor_id))
+    cache.delete(Location.cache_prefix+old_location["id"])
+    cache.delete("sensorsFor:"+location_id)
     return db.replace_item(
         old_location,
         location_schema.dump(updated_location),
@@ -186,6 +190,9 @@ def sensor(location_id, sensor_id):
                 output_schema.dump(updated_sensor),
                 Sensor.container_name,
             )
+            cache.delete("sensorsFor:"+location_id)
+            cache.delete(Sensor.cache_prefix+sensor_id)
+            cache.set(Sensor.cache_prefix+sensor_id, updated_item)
             updated_sensor = output_schema.load(updated_item, unknown="EXCLUDE")
             response = (jsonify(output_schema.dump(updated_sensor)), HTTPStatus.OK)
             return response
