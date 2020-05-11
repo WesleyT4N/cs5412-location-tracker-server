@@ -1,2 +1,4 @@
 *.pyc
 .env.local
+cache/
+.pytest_cache/

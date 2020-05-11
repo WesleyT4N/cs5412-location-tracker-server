@@ -132,7 +132,6 @@ def get_peak_traffic(location_id):
                 jsonify(output_schema.dump(output)),
                 HTTPStatus.OK,
             )
-        print(response.text)
         return (
             response.text,
             response.status_code
