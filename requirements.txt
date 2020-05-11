@@ -24,7 +24,6 @@ pyparsing==2.4.6
 pytest==5.3.5
 python-binary-memcached==0.29.0
 python-dotenv==0.12.0
-python-memcached==1.59
 pytz==2019.3
 requests==2.23.0
 six==1.14.0
