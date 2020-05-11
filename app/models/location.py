@@ -6,18 +6,19 @@ from .base_model import BaseModel
 from .utils import DatabaseContainerEnum
 from . import db, cache
 
+
 class Location(BaseModel):
     container_name = DatabaseContainerEnum.LOCATIONS.name
     cache_prefix = "location:"
 
     def __init__(self,
-        name,
-        id=None,
-        updated_at=None,
-        capacity=None,
-        location_id=None,
-        sensors=[],
-    ):
+                 name,
+                 id=None,
+                 updated_at=None,
+                 capacity=None,
+                 location_id=None,
+                 sensors=[],
+                 ):
         self.id = id
         if self.id is None:
             self.id = uuid.uuid4()
@@ -34,13 +35,13 @@ class Location(BaseModel):
         cached_location = cache.get(Location.cache_prefix+location_id)
         if cached_location:
             return cached_location
-        location = db.get_item_with_id_and_partition_key(location_id, location_id, Location.container_name)
+        location = db.get_item_with_id_and_partition_key(
+            location_id, location_id, Location.container_name)
         cache.set(Location.cache_prefix+location_id, location)
         return location
 
-
     @staticmethod
-    @cache.cached(timeout=300, key_prefix="all_locations")
+    @cache.cached(key_prefix="all_locations")
     def all():
         return db.query_all_items(Location.container_name)
 

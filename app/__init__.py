@@ -18,21 +18,20 @@ def create_app(testing=False):
     register_blueprints(app)
 
     # FS cache
-    cache.init_app(app, {
-        "CACHE_TYPE": "filesystem",
-        "CACHE_THRESHOLD": 1000,
-        "CACHE_DEFAULT_TIMEOUT": 60,
-        "CACHE_DIR": "./cache",
-    })
+    # cache.init_app(app, {
+    #     "CACHE_TYPE": "filesystem",
+    #     "CACHE_THRESHOLD": 1000,
+    #     "CACHE_DEFAULT_TIMEOUT": 60,
+    #     "CACHE_DIR": "./cache",
+    # })
 
     # remote cache
-    # cache.init_app(app, {
-    #     "CACHE_TYPE": "saslmemcached",
-    #     "CACHE_MEMCACHED_SERVERS": [app.config["MEMCACHED_ADDR"]],
-    #     "CACHE_DEFAULT_TIMEOUT": 60,
-    #     "CACHE_MEMCACHED_USERNAME" : app.config["MEMCACHED_USERNAME"],
-    #     "CACHE_MEMCACHED_PASSWORD" : app.config["MEMCACHED_PASSWORD"],
-    # })
+    cache.init_app(app, {
+        "CACHE_TYPE": "app.models.cache.cache",
+        "CACHE_MEMCACHED_SERVERS": [app.config["MEMCACHED_ADDR"]],
+        "CACHE_MEMCACHED_USERNAME": app.config["MEMCACHED_USERNAME"],
+        "CACHE_MEMCACHED_PASSWORD": app.config["MEMCACHED_PASSWORD"],
+    })
     return app
 
 def load_env_vars(app):
