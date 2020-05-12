@@ -4,6 +4,7 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 from app.models import db, cache
 
+
 def create_app(testing=False):
     """
     Create app instance
@@ -34,22 +35,24 @@ def create_app(testing=False):
     })
     return app
 
+
 def load_env_vars(app):
     dotenv_path = os.path.abspath(__file__ + "/../../.env")
     load_dotenv(dotenv_path)
     app.config["DATA_STORE_BASE_URL"] = os.environ["DATA_STORE_BASE_URL"]
-    app.config["SIMULATOR_SERVICE_BASE_URL"] = os.environ["SIMULATOR_SERVICE_BASE_URL"]
+    app.config["SIMULATOR_SERVICE_BASE_URL"] = os.environ["SIMULATOR_SERVICE_BASE_URL"]  # noqa
     app.config["MEMCACHED_ADDR"] = os.environ["MEMCACHED_ADDR"]
     app.config["MEMCACHED_USERNAME"] = os.environ["MEMCACHED_USERNAME"]
     app.config["MEMCACHED_PASSWORD"] = os.environ["MEMCACHED_PASSWORD"]
+
 
 def register_blueprints(app):
     """
     Registers app blueprints
     """
-    from app.routes.locations import locations_bp
-    from app.routes.sensors import sensors_bp
-    from app.routes.traffic import traffic_bp
+    from app.routes.locations.routes import locations_bp
+    from app.routes.sensors.routes import sensors_bp
+    from app.routes.traffic.routes import traffic_bp
     app.register_blueprint(locations_bp)
     app.register_blueprint(sensors_bp)
     app.register_blueprint(traffic_bp)

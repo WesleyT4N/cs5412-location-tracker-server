@@ -1,44 +1,18 @@
 from http import HTTPStatus
-from flask import Blueprint, current_app, request, jsonify
-from marshmallow import fields, post_load, Schema, ValidationError
+from flask import request, jsonify, Blueprint
+from marshmallow import ValidationError
 from azure.cosmos import exceptions
 
 from app.models import db, cache
 from app.models.location import Location
+from app.models.sensor import Sensor
+
+from .schemas import LocationSchema, CreateLocationSchema, UpdateLocationSchema
+
+from app.routes.sensors.utils import delete_sensor_simulation
 
 locations_bp = Blueprint("locations", __name__, url_prefix="/api/locations")
 
-# TODO: Add caching layer
-
-class LocationSchema(Schema):
-    id = fields.UUID()
-    name = fields.Str()
-    capacity = fields.Integer()
-    updated_at = fields.DateTime(data_key="updatedAt")
-    location_id = fields.UUID(data_key="locationId")
-    sensors = fields.List(fields.UUID())
-
-    @post_load
-    def make_location(self, data, **kwarg):
-        return Location(**data)
-
-class CreateLocationSchema(Schema):
-    name = fields.Str()
-    capacity = fields.Integer()
-
-    @post_load
-    def make_location(self, data, **kwarg):
-        return Location(**data)
-
-class UpdateLocationSchema(Schema):
-    name = fields.Str()
-    capacity = fields.Integer()
-
-def get_location(location_id):
-    try:
-        return Location.get_by_id(location_id)
-    except exceptions.CosmosResourceNotFoundError as error:
-        return None
 
 @locations_bp.route("", methods=["GET", "POST"])
 def locations():
@@ -55,7 +29,7 @@ def locations():
             print(
                 "ValidationError: Invalid format detected in location list: ",
                 error.messages,
-            ) # TODO: Implement logging
+            )  # TODO: Implement logging
             return (
                 "Cannot return location list. Invalid results",
                 HTTPStatus.INTERNAL_SERVER_ERROR,
@@ -72,6 +46,8 @@ def locations():
                 serialized_new_loc,
                 new_location.container_name,
             )
+            cache.set(Location.cache_prefix+item["id"], item)
+            cache.delete("all_locations")
             item = output_schema.load(item)
             return (
                 jsonify(output_schema.dump(item)),
@@ -79,7 +55,9 @@ def locations():
             )
         except ValidationError as error:
             # TODO: Implement logging
-            print("ValidationError: Could not create location: ", error.messages)
+            print(
+                "ValidationError: Could not create location: ", error.messages
+            )
             return (
                 "Cannot create location. Invalid arguments",
                 HTTPStatus.BAD_REQUEST,
@@ -90,6 +68,7 @@ def locations():
                 "Could not create location due to an error",
                 HTTPStatus.INTERNAL_SERVER_ERROR,
             )
+
 
 @locations_bp.route("/<location_id>", methods=["GET", "PUT", "DELETE"])
 def location(location_id):
@@ -120,9 +99,13 @@ def location(location_id):
             errors = input_schema.validate(data)
             if len(errors) != 0:
                 raise ValidationError({"messages": errors})
-            data["id"] = location_id
             old_location = Location.get_by_id(location_id)
-            updated_location = output_schema.load(data)
+            merged = {
+                **old_location,
+                **data,
+            }
+            del merged["updatedAt"]
+            updated_location = output_schema.load(merged)
             updated_item = db.replace_item(
                 old_location,
                 output_schema.dump(updated_location),
@@ -136,9 +119,11 @@ def location(location_id):
                 HTTPStatus.OK,
             )
         except ValidationError as error:
-            print("ValidationError: Cannot update location: ", error.messages) # TODO: Implement logging
+            print("ValidationError: Cannot update location: ",
+                  error.messages)  # TODO: Implement logging
             return (
-                "Cannot update location. Invalid arguments", HTTPStatus.BAD_REQUEST,
+                "Cannot update location. Invalid arguments",
+                HTTPStatus.BAD_REQUEST,
             )
         except exceptions.CosmosResourceNotFoundError as error:
             print("Could not find location in container", error)
@@ -146,8 +131,16 @@ def location(location_id):
                 "Cannot update location that does not exist",
                 HTTPStatus.NOT_FOUND,
             )
-    else: # DELETE
+    else:  # DELETE
         try:
+            item = Location.get_by_id(location_id)
+            schema = LocationSchema(unknown="EXCLUDE")
+            item = schema.load(item)
+            sensors = item.sensors
+            for sensor_id in sensors:
+                sensor_id = str(sensor_id)
+                delete_sensor_simulation(sensor_id, location_id)
+                Sensor.delete(sensor_id, location_id)
             if Location.delete(location_id) is None:
                 cache.delete(Location.cache_prefix+location_id)
                 cache.delete("all_locations")
@@ -155,6 +148,13 @@ def location(location_id):
             return (
                 "Error occurred when deleting location",
                 HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
+        except ValidationError as error:
+            print("ValidationError: Cannot delete location: ",
+                  error.messages)  # TODO: Implement logging
+            return (
+                "Cannot delete location. Invalid arguments",
+                HTTPStatus.BAD_REQUEST,
             )
         except exceptions.CosmosHttpResponseError as error:
             print("Could not delete location: ", error)

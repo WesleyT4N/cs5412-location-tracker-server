@@ -1,90 +1,19 @@
-from app.routes.locations import LocationSchema, get_location
+from app.routes.locations.utils import get_location
 from app.models.sensor import Sensor
-from app.models.location import Location
 from app.models import db, cache
 from http import HTTPStatus
-import uuid
-from flask import Blueprint, current_app, request, jsonify
-from marshmallow import fields, post_load, Schema, ValidationError
+from flask import request, jsonify, Blueprint
+from marshmallow import ValidationError
 from azure.cosmos import exceptions
-import requests
 
-sensors_bp = Blueprint("sensors", __name__,
-                       url_prefix="/api/locations/<location_id>/sensors")
-
-
+from .schemas import SensorSchema, CreateSensorSchema, UpdateSensorSchmea
+from .utils import (add_sensor_to_location, remove_sensor_from_location,
+                    delete_sensor_simulation, register_sensor_simulation)
 # TODO: Add Caching Layer
 
 
-class SensorSchema(Schema):
-    id = fields.UUID()
-    name = fields.Str()
-    type = fields.Str()
-    updated_at = fields.DateTime(data_key="updatedAt")
-    location_id = fields.UUID(data_key="locationId")
-
-    @post_load
-    def make_sensor(self, data, **kwarg):
-        return Sensor(**data)
-
-
-class CreateSensorSchema(Schema):
-    name = fields.Str()
-    type = fields.Str()
-    location_id = fields.UUID(data_key="locationId")
-
-    @post_load
-    def make_sensor(self, data, **kwarg):
-        return Sensor(**data)
-
-
-class UpdateSensorSchmea(Schema):
-    name = fields.Str()
-    type = fields.Str()
-
-
-def add_sensor_to_location(sensor_id, old_location):
-    location_schema = LocationSchema(unknown="EXCLUDE")
-    updated_location = location_schema.load(old_location)
-    updated_location.sensors.append(uuid.UUID(sensor_id))
-    location_id = old_location["id"]
-    cache.delete(Location.cache_prefix+location_id)
-    cache.delete("sensorsFor:"+location_id)
-    return db.replace_item(
-        old_location,
-        location_schema.dump(updated_location),
-        updated_location.container_name,
-    )
-
-
-def remove_sensor_from_location(sensor_id, old_location):
-    location_schema = LocationSchema(unknown="EXCLUDE")
-    updated_location = location_schema.load(old_location)
-    if uuid.UUID(sensor_id) in updated_location.sensors:
-        updated_location.sensors.remove(uuid.UUID(sensor_id))
-        location_id = old_location["id"]
-        cache.delete(Location.cache_prefix+location_id)
-        cache.delete("sensorsFor:"+location_id)
-        return db.replace_item(
-            old_location,
-            location_schema.dump(updated_location),
-            updated_location.container_name,
-        )
-    return old_location
-
-
-def register_sensor_simulation(sensor_id, location_id):
-    url = current_app.config["SIMULATOR_SERVICE_BASE_URL"] + \
-        "/api/locations/" + location_id + "/sensors/" + sensor_id
-    return requests.put(url)
-
-
-def delete_sensor_simulation(sensor_id, location_id):
-    url = current_app.config["SIMULATOR_SERVICE_BASE_URL"] + \
-        "/api/locations/" + location_id + "/sensors/" + sensor_id
-    status_code = requests.delete(url).status_code
-    return (status_code == HTTPStatus.OK or status_code == HTTPStatus.NOT_FOUND
-            or status_code == HTTPStatus.BAD_REQUEST)
+sensors_bp = Blueprint("sensors", __name__,
+                       url_prefix="/api/locations/<location_id>/sensors")
 
 
 @sensors_bp.route("", methods=["GET", "POST"])
@@ -132,18 +61,22 @@ def sensors(location_id):
                 Sensor.container_name,
             )
             created_sensor = output_schema.load(item)
-            # Side-effect: Updates location entry to contain the newly created sensor id
+            # Side-effect: Updates location entry to contain
+            # the newly created sensor id
             try:
                 add_sensor_to_location(str(created_sensor.id), location)
-                response = register_sensor_simulation(
+                register_sensor_simulation(
                     str(created_sensor.id), location_id)
-                return (jsonify(output_schema.dump(created_sensor)), HTTPStatus.CREATED)
+                return (
+                    jsonify(output_schema.dump(created_sensor)),
+                    HTTPStatus.CREATED
+                )
                 # if we failed to add, location may not exist anymore.
                 # Roll back sensor creation
-            except exceptions.CosmosHttpResponseError as error:
+            except exceptions.CosmosHttpResponseError:
                 Sensor.delete(str(created_sensor.id), location_id)
                 return (
-                    "Could not register sensor to location, location does not exist.",
+                    "Could not register sensor to location, does not exist.",
                     HTTPStatus.NOT_FOUND,
                 )
         except ValidationError as error:
