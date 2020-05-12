@@ -1,3 +1,7 @@
+from app.routes.locations import LocationSchema, get_location
+from app.models.sensor import Sensor
+from app.models.location import Location
+from app.models import db, cache
 from http import HTTPStatus
 import uuid
 from flask import Blueprint, current_app, request, jsonify
@@ -5,15 +9,12 @@ from marshmallow import fields, post_load, Schema, ValidationError
 from azure.cosmos import exceptions
 import requests
 
-sensors_bp = Blueprint("sensors", __name__, url_prefix="/api/locations/<location_id>/sensors")
+sensors_bp = Blueprint("sensors", __name__,
+                       url_prefix="/api/locations/<location_id>/sensors")
 
-from app.models import db, cache
-from app.models.location import Location
-from app.models.sensor import Sensor
-
-from app.routes.locations import LocationSchema, get_location
 
 # TODO: Add Caching Layer
+
 
 class SensorSchema(Schema):
     id = fields.UUID()
@@ -26,6 +27,7 @@ class SensorSchema(Schema):
     def make_sensor(self, data, **kwarg):
         return Sensor(**data)
 
+
 class CreateSensorSchema(Schema):
     name = fields.Str()
     type = fields.Str()
@@ -35,42 +37,55 @@ class CreateSensorSchema(Schema):
     def make_sensor(self, data, **kwarg):
         return Sensor(**data)
 
+
 class UpdateSensorSchmea(Schema):
     name = fields.Str()
     type = fields.Str()
+
 
 def add_sensor_to_location(sensor_id, old_location):
     location_schema = LocationSchema(unknown="EXCLUDE")
     updated_location = location_schema.load(old_location)
     updated_location.sensors.append(uuid.UUID(sensor_id))
-    cache.delete(Location.cache_prefix+old_location["id"])
+    location_id = old_location["id"]
+    cache.delete(Location.cache_prefix+location_id)
     cache.delete("sensorsFor:"+location_id)
     return db.replace_item(
         old_location,
         location_schema.dump(updated_location),
         updated_location.container_name,
     )
+
 
 def remove_sensor_from_location(sensor_id, old_location):
     location_schema = LocationSchema(unknown="EXCLUDE")
     updated_location = location_schema.load(old_location)
-    updated_location.sensors.remove(uuid.UUID(sensor_id))
-    cache.delete(Location.cache_prefix+old_location["id"])
-    cache.delete("sensorsFor:"+location_id)
-    return db.replace_item(
-        old_location,
-        location_schema.dump(updated_location),
-        updated_location.container_name,
-    )
+    if uuid.UUID(sensor_id) in updated_location.sensors:
+        updated_location.sensors.remove(uuid.UUID(sensor_id))
+        location_id = old_location["id"]
+        cache.delete(Location.cache_prefix+location_id)
+        cache.delete("sensorsFor:"+location_id)
+        return db.replace_item(
+            old_location,
+            location_schema.dump(updated_location),
+            updated_location.container_name,
+        )
+    return old_location
+
 
 def register_sensor_simulation(sensor_id, location_id):
-    url = current_app.config["SIMULATOR_SERVICE_BASE_URL"] + "/api/locations/" + location_id + "/sensors/" + sensor_id
+    url = current_app.config["SIMULATOR_SERVICE_BASE_URL"] + \
+        "/api/locations/" + location_id + "/sensors/" + sensor_id
     return requests.put(url)
 
+
 def delete_sensor_simulation(sensor_id, location_id):
-    url = current_app.config["SIMULATOR_SERVICE_BASE_URL"] + "/api/locations/" + location_id + "/sensors/" + sensor_id
+    url = current_app.config["SIMULATOR_SERVICE_BASE_URL"] + \
+        "/api/locations/" + location_id + "/sensors/" + sensor_id
     status_code = requests.delete(url).status_code
-    return status_code == HTTPStatus.OK or status_code == HTTPStatus.NOT_FOUND
+    return (status_code == HTTPStatus.OK or status_code == HTTPStatus.NOT_FOUND
+            or status_code == HTTPStatus.BAD_REQUEST)
+
 
 @sensors_bp.route("", methods=["GET", "POST"])
 def sensors(location_id):
@@ -94,7 +109,7 @@ def sensors(location_id):
             print(
                 "ValidationError: Invalid format detected in sensor list: ",
                 error.messages,
-            ) # TODO: Implement logging
+            )  # TODO: Implement logging
             return (
                 "Cannot return sensor list. Invalid results",
                 HTTPStatus.INTERNAL_SERVER_ERROR,
@@ -120,7 +135,8 @@ def sensors(location_id):
             # Side-effect: Updates location entry to contain the newly created sensor id
             try:
                 add_sensor_to_location(str(created_sensor.id), location)
-                response = register_sensor_simulation(str(created_sensor.id), location_id)
+                response = register_sensor_simulation(
+                    str(created_sensor.id), location_id)
                 return (jsonify(output_schema.dump(created_sensor)), HTTPStatus.CREATED)
                 # if we failed to add, location may not exist anymore.
                 # Roll back sensor creation
@@ -143,6 +159,7 @@ def sensors(location_id):
                 "Could not create sensor due to an error",
                 HTTPStatus.INTERNAL_SERVER_ERROR,
             )
+
 
 @sensors_bp.route("/<sensor_id>", methods=["GET", "PUT", "DELETE"])
 def sensor(location_id, sensor_id):
@@ -183,7 +200,8 @@ def sensor(location_id, sensor_id):
                 raise ValidationError(errors)
             data["locationId"] = location_id
             output_schema = SensorSchema()
-            old_sensor = Sensor.get_by_id_and_location_id(sensor_id, location_id)
+            old_sensor = Sensor.get_by_id_and_location_id(
+                sensor_id, location_id)
             updated_sensor = output_schema.load(data)
             updated_item = db.replace_item(
                 old_sensor,
@@ -193,11 +211,14 @@ def sensor(location_id, sensor_id):
             cache.delete("sensorsFor:"+location_id)
             cache.delete(Sensor.cache_prefix+sensor_id)
             cache.set(Sensor.cache_prefix+sensor_id, updated_item)
-            updated_sensor = output_schema.load(updated_item, unknown="EXCLUDE")
-            response = (jsonify(output_schema.dump(updated_sensor)), HTTPStatus.OK)
+            updated_sensor = output_schema.load(
+                updated_item, unknown="EXCLUDE")
+            response = (jsonify(output_schema.dump(
+                updated_sensor)), HTTPStatus.OK)
             return response
         except ValidationError as error:
-            print("ValidationError: Cannot update sensor: ", error.messages) # TODO: Implement logging
+            print("ValidationError: Cannot update sensor: ",
+                  error.messages)  # TODO: Implement logging
             return (
                 "Cannot update sensor. Invalid arguments",
                 HTTPStatus.BAD_REQUEST,
@@ -208,7 +229,7 @@ def sensor(location_id, sensor_id):
                 "Cannot update sensor that does not exist",
                 HTTPStatus.NOT_FOUND,
             )
-    else: # DELETE
+    else:  # DELETE
         location = get_location(location_id)
         if not location:
             return (
@@ -217,7 +238,7 @@ def sensor(location_id, sensor_id):
             )
         try:
             if (
-                remove_sensor_from_location(sensor_id, location)
+                remove_sensor_from_location(sensor_id, location) is not None
                 and delete_sensor_simulation(sensor_id, location_id)
                 and Sensor.delete(sensor_id, location_id) is None
             ):
