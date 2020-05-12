@@ -21,4 +21,4 @@ This project uses `pytest` for unit testing.
 
 ## Where to access
 
-Temporarily hosted at `https://loc-traffic-tracker.azurewebsites.net/api/locations/f1ad9aff-6c4b-4e3e-a98c-4de2e8f357a0/sensors`
+Temporarily hosted at [https://loc-traffic-tracker.azurewebsites.net]
