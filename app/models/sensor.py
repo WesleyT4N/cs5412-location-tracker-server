@@ -5,17 +5,18 @@ from .base_model import BaseModel
 from .utils import DatabaseContainerEnum
 from . import db, cache
 
+
 class Sensor(BaseModel):
     container_name = DatabaseContainerEnum.SENSORS.name
     cache_prefix = "sensor:"
 
     def __init__(self,
-        name,
-        type,
-        id=None,
-        updated_at=None,
-        location_id=None
-    ):
+                 name,
+                 type,
+                 id=None,
+                 updated_at=None,
+                 location_id=None
+                 ):
         self.id = id
         if self.id is None:
             self.id = uuid.uuid4()

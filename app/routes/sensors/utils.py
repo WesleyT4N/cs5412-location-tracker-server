@@ -50,5 +50,4 @@ def delete_sensor_simulation(sensor_id, location_id):
     url = current_app.config["SIMULATOR_SERVICE_BASE_URL"] + \
         "/api/locations/" + location_id + "/sensors/" + sensor_id
     status_code = requests.delete(url).status_code
-    return (status_code == HTTPStatus.OK or status_code == HTTPStatus.NOT_FOUND
-            or status_code == HTTPStatus.BAD_REQUEST)
+    return (status_code == HTTPStatus.OK or status_code == HTTPStatus.NOT_FOUND)
